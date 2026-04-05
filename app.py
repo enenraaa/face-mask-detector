@@ -7,6 +7,11 @@ from flask import Flask, jsonify, render_template, request
 from keras.models import load_model
 from PIL import Image
 
+try:
+    import cv2
+except Exception:
+    cv2 = None
+
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "model"
 MODEL_H5_PATH = MODEL_DIR / "mask_detector.h5"
@@ -14,6 +19,7 @@ MODEL_KERAS_PATH = MODEL_DIR / "mask_detector.keras"
 LABELS_PATH = MODEL_DIR / "class_names.json"
 CONFIG_PATH = MODEL_DIR / "training_config.json"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+CONFIDENCE_THRESHOLD = 0.60
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8MB upload limit
@@ -47,7 +53,32 @@ def load_image_size() -> int:
 
 def preprocess_image(uploaded_file) -> np.ndarray:
     image = Image.open(uploaded_file.stream).convert("RGB")
-    image = image.resize((IMG_SIZE, IMG_SIZE))
+    image_array = np.array(image, dtype=np.uint8)
+
+    if cv2 is not None:
+        try:
+            cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            face_detector = cv2.CascadeClassifier(cascade_path)
+            if not face_detector.empty():
+                gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+                faces = face_detector.detectMultiScale(
+                    gray,
+                    scaleFactor=1.1,
+                    minNeighbors=5,
+                    minSize=(40, 40),
+                )
+                if len(faces) > 0:
+                    x, y, w, h = max(faces, key=lambda box: box[2] * box[3])
+                    pad = int(0.2 * max(w, h))
+                    x1 = max(0, x - pad)
+                    y1 = max(0, y - pad)
+                    x2 = min(image_array.shape[1], x + w + pad)
+                    y2 = min(image_array.shape[0], y + h + pad)
+                    image_array = image_array[y1:y2, x1:x2]
+        except Exception:
+            pass
+
+    image = Image.fromarray(image_array).resize((IMG_SIZE, IMG_SIZE))
     image_array = np.array(image, dtype=np.float32) / 255.0
     return np.expand_dims(image_array, axis=0)
 
@@ -91,7 +122,11 @@ def predict():
 
     try:
         image_batch = preprocess_image(file)
-        probabilities = MODEL.predict(image_batch, verbose=0)[0]
+        flipped_batch = np.flip(image_batch, axis=2)
+        probabilities = (
+            MODEL.predict(image_batch, verbose=0)[0]
+            + MODEL.predict(flipped_batch, verbose=0)[0]
+        ) / 2.0
         predicted_idx = int(np.argmax(probabilities))
         predicted_label = (
             CLASS_NAMES[predicted_idx]
@@ -99,6 +134,9 @@ def predict():
             else f"class_{predicted_idx}"
         )
         confidence = float(probabilities[predicted_idx])
+
+        if confidence < CONFIDENCE_THRESHOLD:
+            predicted_label = "uncertain"
 
         class_probabilities = {}
         for idx, prob in enumerate(probabilities):

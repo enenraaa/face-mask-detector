@@ -75,6 +75,8 @@ def build_model(img_size: int, num_classes: int) -> keras.Model:
             layers.Input(shape=(img_size, img_size, 3)),
             layers.RandomFlip("horizontal"),
             layers.RandomRotation(0.08),
+            layers.RandomZoom(0.1),
+            layers.RandomContrast(0.1),
             layers.Conv2D(32, 3, activation="relu"),
             layers.MaxPooling2D(),
             layers.Conv2D(64, 3, activation="relu"),
@@ -90,7 +92,7 @@ def build_model(img_size: int, num_classes: int) -> keras.Model:
     )
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=1e-3),
-        loss="categorical_crossentropy",
+        loss=keras.losses.CategoricalCrossentropy(label_smoothing=0.05),
         metrics=["accuracy"],
     )
     return model
@@ -156,6 +158,9 @@ def main() -> None:
     callbacks = [
         keras.callbacks.EarlyStopping(
             monitor="val_accuracy", patience=5, restore_best_weights=True
+        ),
+        keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss", factor=0.5, patience=2, min_lr=1e-6, verbose=1
         ),
         keras.callbacks.ModelCheckpoint(
             filepath=str(model_path),
