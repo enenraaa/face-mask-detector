@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Face Mask Detector</title>
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #0f172a;
+            --subtle: #475569;
+            --primary: #0ea5e9;
+            --ok: #16a34a;
+            --warn: #dc2626;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at 10% 20%, #e0f2fe 0%, #f8fafc 45%, #eef2ff 100%);
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .app {
+            width: min(920px, 100%);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 26px 24px 8px;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 1.85rem;
+        }
+
+        .subtitle {
+            margin: 8px 0 0;
+            color: var(--subtle);
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px 24px 24px;
+        }
+
+        .panel {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            background: #fff;
+        }
+
+        label {
+            display: inline-block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .btn {
+            margin-top: 12px;
+            width: 100%;
+            border: 0;
+            padding: 12px;
+            border-radius: 10px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        .preview-wrap {
+            border: 1px dashed var(--border);
+            border-radius: 10px;
+            min-height: 260px;
+            display: grid;
+            place-items: center;
+            background: #f8fafc;
+            overflow: hidden;
+        }
+
+        .preview-wrap p {
+            color: var(--subtle);
+            text-align: center;
+            padding: 16px;
+        }
+
+        #previewImage {
+            max-width: 100%;
+            max-height: 350px;
+            display: none;
+        }
+
+        .status {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            color: var(--subtle);
+            min-height: 43px;
+        }
+
+        .status.ok {
+            border-color: #bbf7d0;
+            color: var(--ok);
+            background: #f0fdf4;
+        }
+
+        .status.error {
+            border-color: #fecaca;
+            color: var(--warn);
+            background: #fef2f2;
+        }
+
+        .result {
+            margin-top: 12px;
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+            display: none;
+        }
+
+        .result h3 {
+            margin: 0 0 8px;
+        }
+
+        .result p {
+            margin: 6px 0;
+        }
+
+        .prob-list {
+            margin: 10px 0 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 8px;
+        }
+
+        .prob-item {
+            display: grid;
+            gap: 4px;
+        }
+
+        .bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .bar > span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #0284c7, #22d3ee);
+            width: 0;
+        }
+
+        @media (max-width: 820px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <header class="header">
+            <h1 class="title">Face Mask Detection</h1>
+            <p class="subtitle">Upload a face image and detect if a mask is present.</p>
+        </header>
+
+        <section class="content">
+            <div class="panel">
+                <form id="predictForm">
+                    <label for="imageInput">Choose Image</label>
+                    <input id="imageInput" name="image" type="file" accept="image/png,image/jpeg,image/webp" required />
+                    <button class="btn" type="submit">Analyze</button>
+                </form>
+                <div id="status" class="status">Waiting for an image.</div>
+                <div id="result" class="result">
+                    <h3>Prediction Result</h3>
+                    <p id="predictionText"></p>
+                    <p id="confidenceText"></p>
+                    <ul id="probabilities" class="prob-list"></ul>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="preview-wrap">
+                    <img id="previewImage" alt="Preview" />
+                    <p id="previewPlaceholder">Image preview will appear here.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const form = document.getElementById("predictForm");
+        const fileInput = document.getElementById("imageInput");
+        const previewImage = document.getElementById("previewImage");
+        const previewPlaceholder = document.getElementById("previewPlaceholder");
+        const statusBox = document.getElementById("status");
+        const resultBox = document.getElementById("result");
+        const predictionText = document.getElementById("predictionText");
+        const confidenceText = document.getElementById("confidenceText");
+        const probabilitiesList = document.getElementById("probabilities");
+
+        function setStatus(message, type = "") {
+            statusBox.textContent = message;
+            statusBox.className = "status";
+            if (type) {
+                statusBox.classList.add(type);
+            }
+        }
+
+        function formatLabel(label) {
+            return label.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        fileInput.addEventListener("change", () => {
+            const file = fileInput.files[0];
+            resultBox.style.display = "none";
+            probabilitiesList.innerHTML = "";
+
+            if (!file) {
+                previewImage.style.display = "none";
+                previewPlaceholder.style.display = "block";
+                setStatus("Waiting for an image.");
+                return;
+            }
+
+            const imageUrl = URL.createObjectURL(file);
+            previewImage.src = imageUrl;
+            previewImage.style.display = "block";
+            previewPlaceholder.style.display = "none";
+            setStatus("Ready to analyze.");
+        });
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) {
+                setStatus("Please select an image first.", "error");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("image", file);
+            setStatus("Analyzing image...");
+            resultBox.style.display = "none";
+
+            try {
+                const response = await fetch("/predict", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Prediction failed.");
+                }
+
+                const prediction = formatLabel(data.prediction);
+                const confidence = (data.confidence * 100).toFixed(2);
+                predictionText.textContent = `Class: ${prediction}`;
+                confidenceText.textContent = `Confidence: ${confidence}%`;
+
+                const entries = Object.entries(data.probabilities).sort((a, b) => b[1] - a[1]);
+                probabilitiesList.innerHTML = "";
+                for (const [label, prob] of entries) {
+                    const percent = (prob * 100).toFixed(2);
+                    const item = document.createElement("li");
+                    item.className = "prob-item";
+                    item.innerHTML = `
+                        <div>${formatLabel(label)}: ${percent}%</div>
+                        <div class="bar"><span style="width:${percent}%"></span></div>
+                    `;
+                    probabilitiesList.appendChild(item);
+                }
+
+                resultBox.style.display = "block";
+                setStatus("Prediction complete.", "ok");
+            } catch (error) {
+                setStatus(error.message, "error");
+            }
+        });
+    </script>
+</body>
+</html>

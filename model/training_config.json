@@ -1,0 +1,9 @@
+{
+  "img_size": 128,
+  "batch_size": 32,
+  "epochs": 10,
+  "class_names": [
+    "with_mask",
+    "without_mask"
+  ]
+}
