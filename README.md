@@ -148,11 +148,3 @@ web: gunicorn app:app
   - Select project interpreter: `venv\Scripts\python.exe`
   - Restart Pylance/VS Code window.
 
-## Git Hygiene (Recommended)
-Do not commit:
-- `venv/`
-- `dataset/` (raw images)
-- `model/*.h5` and large generated artifacts
-- `.env` and secrets
-
-Use placeholders/docs so others can reproduce safely.
