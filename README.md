@@ -10,7 +10,7 @@ A web app that predicts whether a face is wearing a mask from an uploaded image.
 - Confidence gate (`uncertain` below threshold).
 
 ## Tech Stack
-- Frontend: HTML, CSS, JavaScript
+- Frontend: Server-rendered HTML Templates with Flask Framework
 - Backend: Python, Flask
 - Model: TensorFlow/Keras CNN
 - Inference utils: Pillow, OpenCV (headless)
