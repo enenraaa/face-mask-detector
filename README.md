@@ -61,6 +61,12 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1
 ```
 
+Linux (Bash):
+```bash
+python -m venv venv
+source ./venv/bin/activate
+```
+
 3. Install dependencies:
 ```powershell
 pip install -r requirements.txt
